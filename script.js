@@ -28,3 +28,27 @@ function calculateCalories(steps, cyclingMinutes) {
   const cyclingCalories = cyclingMinutes * (8 * 3.5 * weight / 200); // Cycling MET = 8
   return stepCalories + cyclingCalories;
 }
+// Load saved data when the app starts
+document.addEventListener('DOMContentLoaded', () => {
+  const heightInput = document.getElementById('heightInput');
+  const weightInput = document.getElementById('weightInput');
+  const ageInput = document.getElementById('ageInput');
+
+  // Load saved values
+  heightInput.value = localStorage.getItem('height') || '';
+  weightInput.value = localStorage.getItem('weight') || '';
+  ageInput.value = localStorage.getItem('age') || '';
+});
+
+// Save data when inputs are changed
+document.getElementById('heightInput').addEventListener('input', (e) => {
+  localStorage.setItem('height', e.target.value);
+});
+
+document.getElementById('weightInput').addEventListener('input', (e) => {
+  localStorage.setItem('weight', e.target.value);
+});
+
+document.getElementById('ageInput').addEventListener('input', (e) => {
+  localStorage.setItem('age', e.target.value);
+});
