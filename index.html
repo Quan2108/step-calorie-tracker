@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wristband Tracker</title>
+  <title>Fitness Tracker</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,17 +12,22 @@
       margin: 0;
       padding: 0;
     }
-    .container {
-      max-width: 600px;
-      margin: 20px auto;
+    header {
+      background-color: #ff99c8;
+      color: white;
       padding: 20px;
-      background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-    h1 {
       text-align: center;
-      color: #ff66a3;
+    }
+    main {
+      padding: 20px;
+    }
+    .container {
+      max-width: 500px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
     .input-group {
       margin-bottom: 15px;
@@ -30,66 +35,138 @@
     .input-group label {
       display: block;
       margin-bottom: 5px;
-      font-weight: bold;
     }
     .input-group input {
       width: 100%;
-      padding: 10px;
+      padding: 8px;
       border: 1px solid #ccc;
-      border-radius: 5px;
+      border-radius: 4px;
     }
     button {
-      width: 100%;
-      padding: 10px;
-      background: #ff66a3;
-      color: #fff;
+      background-color: #ff99c8;
+      color: white;
       border: none;
-      border-radius: 5px;
+      padding: 10px 15px;
+      border-radius: 4px;
       cursor: pointer;
     }
-    button:hover {
-      background: #ff3385;
+    button:disabled {
+      background-color: #ccc;
     }
     .history {
       margin-top: 20px;
     }
+    .history-item {
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Wristband Tracker</h1>
-    <div class="input-group">
-      <label for="weight">Weight (kg)</label>
-      <input type="number" id="weight" placeholder="Enter your weight">
-    </div>
-    <div class="input-group">
-      <label for="height">Height (cm)</label>
-      <input type="number" id="height" placeholder="Enter your height">
-    </div>
-    <div class="input-group">
-      <label for="age">Age</label>
-      <input type="number" id="age" placeholder="Enter your age">
-    </div>
-  <div class="input-group">
-    <button id="saveData">Save Personal Info</button>
-  </div>
-    <div class="input-group">
-      <button id="connect">Connect Wristband</button>
-    </div>
-    <div class="input-group">
-      <button id="toggleDevice">Turn On/Off Wristband</button>
-    </div>
-    <div class="input-group">
+  <header>
+    <h1>Fitness Tracker</h1>
+  </header>
+  <main>
+    <div class="container">
+      <h2>Real-Time Data</h2>
       <p>Steps: <span id="steps">0</span></p>
-      <p>Cycling (km): <span id="cycling">0.0</span></p>
-      <p>Calories Burned: <span id="calories">0</span></p>
-      <p>Battery Level: <span id="battery">0%</span></p>
+      <p>Cycling: <span id="cycling">0</span></p>
+      <p>Calories: <span id="calories">0</span></p>
+      <p>Battery: <span id="battery">0%</span></p>
+      <button id="connectBtn">Connect to Device</button>
+      <button id="toggleBtn" disabled>Turn Device Off</button>
+      <hr>
+      <h2>Profile</h2>
+      <div class="input-group">
+        <label for="weight">Weight (kg)</label>
+        <input type="number" id="weight" placeholder="Enter weight">
+      </div>
+      <div class="input-group">
+        <label for="height">Height (cm)</label>
+        <input type="number" id="height" placeholder="Enter height">
+      </div>
+      <div class="input-group">
+        <label for="age">Age</label>
+        <input type="number" id="age" placeholder="Enter age">
+      </div>
+      <button id="saveProfile">Save Profile</button>
+      <hr>
+      <h2>History</h2>
+      <div id="history" class="history"></div>
     </div>
-    <div class="history">
-      <h3>Activity History</h3>
-      <div id="history"></div>
-    </div>
-  </div>
-  <script src="script.js"></script>
+  </main>
+
+  <script>
+    const connectBtn = document.getElementById('connectBtn');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const saveProfileBtn = document.getElementById('saveProfile');
+    const historyDiv = document.getElementById('history');
+    const stepsSpan = document.getElementById('steps');
+    const cyclingSpan = document.getElementById('cycling');
+    const caloriesSpan = document.getElementById('calories');
+    const batterySpan = document.getElementById('battery');
+
+    let bleDevice, gattServer;
+    let profile = { weight: 70, height: 170, age: 25 }; // Default profile data
+
+    // Load profile from localStorage
+    if (localStorage.getItem('profile')) {
+      profile = JSON.parse(localStorage.getItem('profile'));
+      document.getElementById('weight').value = profile.weight;
+      document.getElementById('height').value = profile.height;
+      document.getElementById('age').value = profile.age;
+    }
+
+    saveProfileBtn.addEventListener('click', () => {
+      profile.weight = document.getElementById('weight').value;
+      profile.height = document.getElementById('height').value;
+      profile.age = document.getElementById('age').value;
+      localStorage.setItem('profile', JSON.stringify(profile));
+      alert('Profile saved!');
+    });
+
+    connectBtn.addEventListener('click', async () => {
+      try {
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'FitnessTracker' }],
+          optionalServices: ['180D']
+        });
+        gattServer = await bleDevice.gatt.connect();
+        alert('Device connected!');
+        toggleBtn.disabled = false;
+
+        // Fetch and display real-time data
+        const fitnessService = await gattServer.getPrimaryService('180D');
+        const stepsCharacteristic = await fitnessService.getCharacteristic('2A78');
+        const cyclingCharacteristic = await fitnessService.getCharacteristic('2A79');
+        const batteryCharacteristic = await fitnessService.getCharacteristic('2A19');
+
+        stepsCharacteristic.startNotifications();
+        stepsCharacteristic.addEventListener('characteristicvaluechanged', event => {
+          stepsSpan.textContent = parseInt(event.target.value.getUint8(0));
+        });
+
+        cyclingCharacteristic.startNotifications();
+        cyclingCharacteristic.addEventListener('characteristicvaluechanged', event => {
+          cyclingSpan.textContent = parseInt(event.target.value.getUint8(0));
+        });
+
+        batteryCharacteristic.startNotifications();
+        batteryCharacteristic.addEventListener('characteristicvaluechanged', event => {
+          batterySpan.textContent = parseInt(event.target.value.getUint8(0)) + '%';
+        });
+      } catch (error) {
+        console.error(error);
+        alert('Failed to connect to device.');
+      }
+    });
+
+    toggleBtn.addEventListener('click', async () => {
+      const fitnessService = await gattServer.getPrimaryService('180D');
+      const commandCharacteristic = await fitnessService.getCharacteristic('2A56');
+      const currentState = toggleBtn.textContent.includes('Off') ? 0 : 1; // Toggle state
+      await commandCharacteristic.writeValue(Uint8Array.of(currentState));
+      toggleBtn.textContent = currentState ? 'Turn Device On' : 'Turn Device Off';
+    });
+  </script>
 </body>
 </html>
