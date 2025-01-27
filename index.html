@@ -2,191 +2,91 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Health Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wristband Tracker</title>
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: Arial, sans-serif;
+      background-color: #ffe6f0;
+      color: #333;
       margin: 0;
       padding: 0;
-      background-color: #fff;
-      color: #333;
     }
-
-    header {
-      background: linear-gradient(90deg, #d63384, #e066a8);
-      padding: 10px 20px;
-      color: white;
-      text-align: center;
-      font-size: 24px;
-      font-weight: bold;
-    }
-
     .container {
+      max-width: 600px;
+      margin: 20px auto;
       padding: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .card {
-      width: 90%;
-      max-width: 400px;
-      background-color: #f9f9f9;
-      border-radius: 15px;
-      padding: 20px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    label {
-      font-size: 16px;
-      display: block;
-      margin: 10px 0 5px;
-      color: #666;
-    }
-
-    input[type="number"] {
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
-      border: 1px solid #ccc;
+      background: #fff;
       border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      text-align: center;
+      color: #ff66a3;
+    }
+    .input-group {
       margin-bottom: 15px;
     }
-
+    .input-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
     button {
       width: 100%;
-      padding: 12px;
-      font-size: 16px;
-      color: white;
-      background: linear-gradient(90deg, #d63384, #e066a8);
+      padding: 10px;
+      background: #ff66a3;
+      color: #fff;
       border: none;
-      border-radius: 10px;
+      border-radius: 5px;
       cursor: pointer;
     }
-
     button:hover {
-      background-color: #b82a70;
+      background: #ff3385;
     }
-
-    footer {
-      text-align: center;
+    .history {
       margin-top: 20px;
-      font-size: 14px;
-      color: #666;
     }
   </style>
 </head>
 <body>
-  <header>Health Tracker</header>
-
   <div class="container">
-    <!-- Enter Details Section -->
-    <div class="card">
-      <h1>Enter Your Details</h1>
-      <label for="height">Height (cm):</label>
-      <input type="number" id="height" placeholder="Enter your height">
-      <label for="weight">Weight (kg):</label>
+    <h1>Wristband Tracker</h1>
+    <div class="input-group">
+      <label for="weight">Weight (kg)</label>
       <input type="number" id="weight" placeholder="Enter your weight">
-      <label for="age">Age (years):</label>
+    </div>
+    <div class="input-group">
+      <label for="height">Height (cm)</label>
+      <input type="number" id="height" placeholder="Enter your height">
+    </div>
+    <div class="input-group">
+      <label for="age">Age</label>
       <input type="number" id="age" placeholder="Enter your age">
-      <button id="saveButton">Save Details</button>
     </div>
-
-    <!-- Bluetooth Info Section -->
-    <div class="card">
-      <h1>Device Info</h1>
-      <p>Bluetooth Status: <span id="bluetoothStatus">Disconnected</span></p>
-      <p>Battery Level: <span id="batteryLevel">--%</span></p>
-      <button id="toggleDeviceButton">Connect Device</button>
+    <div class="input-group">
+      <button id="connect">Connect Wristband</button>
     </div>
-
-    <!-- History Section -->
-    <div class="card">
-      <h1>Calories History</h1>
-      <ul id="historyList"></ul>
-      <button id="clearHistoryButton">Clear History</button>
+    <div class="input-group">
+      <button id="toggleDevice">Turn On/Off Wristband</button>
+    </div>
+    <div class="input-group">
+      <p>Steps: <span id="steps">0</span></p>
+      <p>Cycling (km): <span id="cycling">0.0</span></p>
+      <p>Calories Burned: <span id="calories">0</span></p>
+      <p>Battery Level: <span id="battery">0%</span></p>
+    </div>
+    <div class="history">
+      <h3>Activity History</h3>
+      <div id="history"></div>
     </div>
   </div>
-
-  <footer>© 2025 Health Tracker</footer>
-
-  <script>
-    // Save and Load User Data (Local Storage)
-    document.getElementById("saveButton").addEventListener("click", () => {
-      const height = document.getElementById("height").value;
-      const weight = document.getElementById("weight").value;
-      const age = document.getElementById("age").value;
-
-      if (height && weight && age) {
-        localStorage.setItem("userHeight", height);
-        localStorage.setItem("userWeight", weight);
-        localStorage.setItem("userAge", age);
-        alert("Details saved successfully!");
-      } else {
-        alert("Please fill in all fields.");
-      }
-    });
-
-    window.onload = () => {
-      const height = localStorage.getItem("userHeight");
-      const weight = localStorage.getItem("userWeight");
-      const age = localStorage.getItem("userAge");
-
-      if (height) document.getElementById("height").value = height;
-      if (weight) document.getElementById("weight").value = weight;
-      if (age) document.getElementById("age").value = age;
-    };
-
-    // Bluetooth Connectivity
-    let bluetoothDevice = null;
-    let batteryLevelCharacteristic = null;
-
-    document.getElementById("toggleDeviceButton").addEventListener("click", async () => {
-      if (bluetoothDevice) {
-        bluetoothDevice.gatt.disconnect();
-        bluetoothDevice = null;
-        document.getElementById("bluetoothStatus").textContent = "Disconnected";
-        return;
-      }
-
-      try {
-        const device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: ["battery_service"]
-        });
-
-        bluetoothDevice = device;
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService("battery_service");
-        batteryLevelCharacteristic = await service.getCharacteristic("battery_level");
-
-        document.getElementById("bluetoothStatus").textContent = "Connected";
-        updateBatteryLevel();
-      } catch (error) {
-        alert("Failed to connect: " + error.message);
-      }
-    });
-
-    async function updateBatteryLevel() {
-      if (!batteryLevelCharacteristic) return;
-
-      const value = await batteryLevelCharacteristic.readValue();
-      const batteryLevel = value.getUint8(0);
-      document.getElementById("batteryLevel").textContent = `${batteryLevel}%`;
-
-      setTimeout(updateBatteryLevel, 5000); // Update every 5 seconds
-    }
-
-    // Clear History
-    document.getElementById("clearHistoryButton").addEventListener("click", () => {
-      document.getElementById("historyList").innerHTML = "";
-      alert("History cleared.");
-    });
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
