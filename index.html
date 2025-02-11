@@ -4,184 +4,91 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fitness Tracker</title>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="Fitness">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
-        :root {
-            --pink-primary: #ff69b4;
-            --pink-secondary: #ffb6c1;
-        }
-        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell;
-            background: linear-gradient(135deg, var(--pink-primary), var(--pink-secondary));
-            color: white;
-            min-height: 100vh;
-            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #ffc0cb;
+            text-align: center;
         }
-
         .container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .battery {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .battery-icon {
-            width: 40px;
-            height: 20px;
-            border: 2px solid white;
-            border-radius: 4px;
-            position: relative;
-        }
-
-        .battery-level {
-            height: 100%;
-            background: pink;
-            transition: width 0.5s;
-        }
-
-        input {
-            padding: 8px;
-            border: 1px solid var(--pink-primary);
-            border-radius: 8px;
-            margin: 5px;
-            width: 120px;
-        }
-
-        button {
-            background: var(--pink-primary);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            margin: 5px;
-        }
-
-        #historyList {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px;
+            max-width: 400px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
             border-radius: 10px;
-            margin-top: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        button {
+            background-color: #ff69b4;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background-color: #ddd;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="battery">
-            <div class="battery-icon">
-                <div class="battery-level" id="batteryLevelBar"></div>
-            </div>
-            <span id="batteryPercentage">--%</span>
-        </div>
-
-        <h1>Fitness Tracker</h1>
-
-        <div class="user-data">
-            <input type="number" id="weight" placeholder="Weight (kg)" value="">
-            <input type="number" id="height" placeholder="Height (cm)" value="">
-            <input type="number" id="age" placeholder="Age" value="">
-            <button onclick="saveUserData()">Save Data</button>
-        </div>
-
-        <div class="stats">
-            <h2>Today's Activity</h2>
-            <p>Steps: <span id="steps">0</span></p>
-            <p>Cycling Distance: <span id="cycling">0.00</span> km</p>
-            <p>Calories Burned: <span id="calories">0</span> kcal</p>
-        </div>
-
-        <button onclick="connectDevice()">Connect Device</button>
-        <button onclick="togglePower()">Power Toggle</button>
-
-        <div class="history">
-            <h2>History</h2>
-            <div id="historyList"></div>
-        </div>
+        <h2>Fitness Tracker</h2>
+        <p>Steps: <span id="steps">0</span></p>
+        <p>Calories Burned: <span id="calories">0</span> kcal</p>
+        <p>Battery: <span id="battery">100%</span></p>
+        <button id="connect">Connect to Device</button>
+        <button id="toggle">Turn Off</button>
     </div>
-
-      <script>
+    
+    <script>
         let device;
-        let fitnessService;
-        let batteryService;
-        let userData = {
-            weight: localStorage.getItem('weight') || 70,
-            height: localStorage.getItem('height') || 170,
-            age: localStorage.getItem('age') || 30
-        };
+        let stepCharacteristic, batteryCharacteristic, controlCharacteristic;
+        let deviceOn = true;
 
-        // Initialize form values
-        document.getElementById('weight').value = userData.weight;
-        document.getElementById('height').value = userData.height;
-        document.getElementById('age').value = userData.age;
-
-        // Register Service Worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
-                .then(() => console.log('Service Worker registered'));
-        }
-
-        async function connectDevice() {
+        document.getElementById("connect").addEventListener("click", async () => {
             try {
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: "FitnessBand" }],
-                    optionalServices: [
-                        '00001234-0000-1000-8000-00805F9B34FB', // Fitness
-                        '0000180F-0000-1000-8000-00805F9B34FB',  // Battery
-                        '00001800-0000-1000-8000-00805F9B34FB'   // Generic Access
-                    ]
+                    acceptAllDevices: true,
+                    optionalServices: [0x181A]
                 });
-
                 const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(0x181A);
+                stepCharacteristic = await service.getCharacteristic(0x2A53);
+                batteryCharacteristic = await service.getCharacteristic(0x2A19);
+                controlCharacteristic = await service.getCharacteristic(0x2A56);
                 
-                // Get services
-                fitnessService = await server.getPrimaryService('00001234-0000-1000-8000-00805F9B34FB');
-                batteryService = await server.getPrimaryService('0000180F-0000-1000-8000-00805F9B34FB');
-
-                // Get characteristics
-                const stepsChar = await fitnessService.getCharacteristic('0000ABCD-0000-1000-8000-00805F9B34FB');
-                const bikeChar = await fitnessService.getCharacteristic('0000WXYZ-0000-1000-8000-00805F9B34FB');
-                const batteryChar = await batteryService.getCharacteristic('00002A19-0000-1000-8000-00805F9B34FB');
-                const powerChar = await fitnessService.getCharacteristic('0000FFF1-0000-1000-8000-00805F9B34FB');
-
-                // Enable notifications
-                await stepsChar.startNotifications();
-                await bikeChar.startNotifications();
-                await batteryChar.startNotifications();
-
-                // Event listeners
-                stepsChar.addEventListener('characteristicvaluechanged', event => {
-                    const steps = event.target.value.getUint32(0, true);
-                    document.getElementById('steps').textContent = steps;
-                    updateCalories();
-                });
-
-                bikeChar.addEventListener('characteristicvaluechanged', event => {
-                    const distance = event.target.value.getFloat32(0, true).toFixed(2);
-                    document.getElementById('cycling').textContent = distance;
-                    updateCalories();
-                });
-
-                batteryChar.addEventListener('characteristicvaluechanged', event => {
-                    const percentage = event.target.value.getUint8(0);
-                    updateBatteryUI(percentage);
-                });
-
+                stepCharacteristic.addEventListener("characteristicvaluechanged", handleStepData);
+                batteryCharacteristic.addEventListener("characteristicvaluechanged", handleBatteryData);
+                
+                await stepCharacteristic.startNotifications();
+                await batteryCharacteristic.startNotifications();
+                
+                alert("Connected to device!");
             } catch (error) {
-                console.error('Connection failed:', error);
+                alert("Failed to connect: " + error);
             }
+        });
+
+        document.getElementById("toggle").addEventListener("click", async () => {
+            if (!controlCharacteristic) return;
+            deviceOn = !deviceOn;
+            let value = new Uint8Array([deviceOn ? 0x01 : 0x00]);
+            await controlCharacteristic.writeValue(value);
+            document.getElementById("toggle").innerText = deviceOn ? "Turn Off" : "Turn On";
+        });
+
+        function handleStepData(event) {
+            let data = new TextDecoder().decode(event.target.value);
+            let [steps, calories] = data.split(",");
+            document.getElementById("steps").innerText = steps;
+            document.getElementById("calories").innerText = calories;
         }
 
-        // Keep the rest of your existing JavaScript functions
+        function handleBatteryData(event) {
+            let battery = event.target.value.getUint8(0);
+            document.getElementById("battery").innerText = battery + "%";
+        }
     </script>
 </body>
 </html>
