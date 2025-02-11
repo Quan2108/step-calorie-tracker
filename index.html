@@ -5,49 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fitness Tracker</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Fitness">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="manifest" href="/manifest.json">
     <style>
-        /* Your existing CSS styles */
+        /* Keep existing styles */
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="battery">
-            <div class="battery-icon">
-                <div class="battery-level" id="batteryLevelBar"></div>
-            </div>
-            <span id="batteryPercentage">--%</span>
-        </div>
-
-        <h1>Fitness Tracker</h1>
-
-        <div class="user-data">
-            <input type="number" id="weight" placeholder="Weight (kg)" value="">
-            <input type="number" id="height" placeholder="Height (cm)" value="">
-            <input type="number" id="age" placeholder="Age" value="">
-            <button onclick="saveUserData()">Save Data</button>
-        </div>
-
-        <div class="stats">
-            <h2>Today's Activity</h2>
-            <p>Steps: <span id="steps">0</span></p>
-            <p>Cycling Distance: <span id="cycling">0.00</span> km</p>
-            <p>Calories Burned: <span id="calories">0</span> kcal</p>
-        </div>
-
-        <button onclick="connectDevice()">Connect Device</button>
-        <button onclick="togglePower()">Power Toggle</button>
-
-        <div class="history">
-            <h2>History</h2>
-            <div id="historyList"></div>
-        </div>
-    </div>
+    <!-- Keep existing HTML structure -->
 
     <script>
         let device;
         let fitnessService;
+        let batteryService;
         let userData = {
             weight: localStorage.getItem('weight') || 70,
             height: localStorage.getItem('height') || 170,
@@ -55,32 +25,68 @@
         };
 
         // Initialize form values
-        function initializeUserData() {
-            document.getElementById('weight').value = userData.weight;
-            document.getElementById('height').value = userData.height;
-            document.getElementById('age').value = userData.age;
+        document.getElementById('weight').value = userData.weight;
+        document.getElementById('height').value = userData.height;
+        document.getElementById('age').value = userData.age;
+
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(() => console.log('Service Worker registered'));
         }
 
-        // Save user data to localStorage
-        function saveUserData() {
-            const weight = document.getElementById('weight').value;
-            const height = document.getElementById('height').value;
-            const age = document.getElementById('age').value;
+        async function connectDevice() {
+            try {
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: "FitnessBand" }],
+                    optionalServices: [
+                        '00001234-0000-1000-8000-00805F9B34FB', // Fitness
+                        '0000180F-0000-1000-8000-00805F9B34FB',  // Battery
+                        '00001800-0000-1000-8000-00805F9B34FB'   // Generic Access
+                    ]
+                });
 
-            if (weight && height && age) {
-                localStorage.setItem('weight', weight);
-                localStorage.setItem('height', height);
-                localStorage.setItem('age', age);
-                alert('Data saved successfully!');
-            } else {
-                alert('Please fill in all fields before saving.');
+                const server = await device.gatt.connect();
+                
+                // Get services
+                fitnessService = await server.getPrimaryService('00001234-0000-1000-8000-00805F9B34FB');
+                batteryService = await server.getPrimaryService('0000180F-0000-1000-8000-00805F9B34FB');
+
+                // Get characteristics
+                const stepsChar = await fitnessService.getCharacteristic('0000ABCD-0000-1000-8000-00805F9B34FB');
+                const bikeChar = await fitnessService.getCharacteristic('0000WXYZ-0000-1000-8000-00805F9B34FB');
+                const batteryChar = await batteryService.getCharacteristic('00002A19-0000-1000-8000-00805F9B34FB');
+                const powerChar = await fitnessService.getCharacteristic('0000FFF1-0000-1000-8000-00805F9B34FB');
+
+                // Enable notifications
+                await stepsChar.startNotifications();
+                await bikeChar.startNotifications();
+                await batteryChar.startNotifications();
+
+                // Event listeners
+                stepsChar.addEventListener('characteristicvaluechanged', event => {
+                    const steps = event.target.value.getUint32(0, true);
+                    document.getElementById('steps').textContent = steps;
+                    updateCalories();
+                });
+
+                bikeChar.addEventListener('characteristicvaluechanged', event => {
+                    const distance = event.target.value.getFloat32(0, true).toFixed(2);
+                    document.getElementById('cycling').textContent = distance;
+                    updateCalories();
+                });
+
+                batteryChar.addEventListener('characteristicvaluechanged', event => {
+                    const percentage = event.target.value.getUint8(0);
+                    updateBatteryUI(percentage);
+                });
+
+            } catch (error) {
+                console.error('Connection failed:', error);
             }
         }
 
-        // Initialize user data on page load
-        window.addEventListener('load', initializeUserData);
-
-        // Your existing BLE and other functions
+        // Keep the rest of your existing JavaScript functions
     </script>
 </body>
 </html>
