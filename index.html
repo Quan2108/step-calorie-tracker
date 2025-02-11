@@ -3,57 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bluetooth Fitness Tracker</title>
+    <title>Fitness Tracker</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #ffccff; text-align: center; }
-        button { font-size: 20px; padding: 10px; margin: 10px; background: #ff66b2; color: white; border: none; border-radius: 10px; cursor: pointer; }
+        body { background-color: pink; font-family: Arial, sans-serif; text-align: center; }
+        button { font-size: 20px; padding: 10px; margin: 10px; cursor: pointer; }
         #status { font-size: 18px; margin-top: 20px; }
     </style>
 </head>
 <body>
-    <h1>Bluetooth Fitness Tracker</h1>
-    <button onclick="connectBluetooth()">Connect to XIAO</button>
-    <p id="status">Not Connected</p>
-    <p>Steps: <span id="steps">0</span></p>
-    <p>Calories Burned: <span id="calories">0</span></p>
-    <p>Cycling Km: <span id="cycling">0</span></p>
-    <p>Battery: <span id="battery">100%</span></p>
+    <h1>Fitness Tracker</h1>
+    <button onclick="connectBLE()">Connect to Device</button>
+    <button onclick="toggleDevice()">Turn On/Off</button>
+    <p id="status">Status: Disconnected</p>
+    <h2>History</h2>
+    <ul id="history"></ul>
 
     <script>
-        let device, server, service, characteristic;
+        let bleDevice;
+        let bleServer;
+        let bleService;
+        let bleCharacteristic;
 
-        async function connectBluetooth() {
+        async function connectBLE() {
             try {
-                device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: false,
-                    filters: [{ name: "XIAO_Fitness_Tracker" }],
-                    optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['battery_service']
                 });
-
-                document.getElementById('status').innerText = "Connecting...";
-                server = await device.gatt.connect();
-                service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
-                characteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
-
-                document.getElementById('status').innerText = "Connected!";
+                bleServer = await bleDevice.gatt.connect();
+                document.getElementById("status").innerText = "Status: Connected!";
+                console.log("Connected to device!");
                 
-                // Start Notifications
-                characteristic.addEventListener('characteristicvaluechanged', handleData);
-                await characteristic.startNotifications();
+                // Read Battery Level (Optional)
+                bleService = await bleServer.getPrimaryService('battery_service');
+                bleCharacteristic = await bleService.getCharacteristic('battery_level');
+                let batteryValue = await bleCharacteristic.readValue();
+                let batteryLevel = batteryValue.getUint8(0);
+                console.log("Battery Level:", batteryLevel);
+                
+                // Simulate receiving step data
+                updateHistory("Steps: 100, Calories: 4.0, Cycling: 1.0 km");
             } catch (error) {
-                document.getElementById('status').innerText = "Connection Failed!";
-                console.error(error);
+                console.log("Connection Failed", error);
+                document.getElementById("status").innerText = "Status: Connection Failed!";
             }
         }
 
-        function handleData(event) {
-            let value = new TextDecoder().decode(event.target.value);
-            let [steps, calories, cycling, battery] = value.split(",");
+        function updateHistory(data) {
+            let historyList = document.getElementById("history");
+            let newItem = document.createElement("li");
+            newItem.textContent = data;
+            historyList.appendChild(newItem);
+        }
 
-            document.getElementById("steps").innerText = steps;
-            document.getElementById("calories").innerText = calories;
-            document.getElementById("cycling").innerText = cycling;
-            document.getElementById("battery").innerText = battery + "%";
+        function toggleDevice() {
+            alert("Toggling Device On/Off via Bluetooth...");
         }
     </script>
 </body>
