@@ -3,90 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fitness Tracker</title>
+    <title>Bluetooth Fitness Tracker</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #ffc0cb;
-            text-align: center;
-        }
-        .container {
-            max-width: 400px;
-            margin: 20px auto;
-            padding: 20px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        button {
-            background-color: #ff69b4;
-            color: white;
-            padding: 10px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        button:disabled {
-            background-color: #ddd;
-        }
+        body { font-family: Arial, sans-serif; background-color: #ffccff; text-align: center; }
+        button { font-size: 20px; padding: 10px; margin: 10px; background: #ff66b2; color: white; border: none; border-radius: 10px; cursor: pointer; }
+        #status { font-size: 18px; margin-top: 20px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Fitness Tracker</h2>
-        <p>Steps: <span id="steps">0</span></p>
-        <p>Calories Burned: <span id="calories">0</span> kcal</p>
-        <p>Battery: <span id="battery">100%</span></p>
-        <button id="connect">Connect to Device</button>
-        <button id="toggle">Turn Off</button>
-    </div>
-    
-    <script>
-        let device;
-        let stepCharacteristic, batteryCharacteristic, controlCharacteristic;
-        let deviceOn = true;
+    <h1>Bluetooth Fitness Tracker</h1>
+    <button onclick="connectBluetooth()">Connect to XIAO</button>
+    <p id="status">Not Connected</p>
+    <p>Steps: <span id="steps">0</span></p>
+    <p>Calories Burned: <span id="calories">0</span></p>
+    <p>Cycling Km: <span id="cycling">0</span></p>
+    <p>Battery: <span id="battery">100%</span></p>
 
-        document.getElementById("connect").addEventListener("click", async () => {
+    <script>
+        let device, server, service, characteristic;
+
+        async function connectBluetooth() {
             try {
                 device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [0x181A]
+                    acceptAllDevices: false,
+                    filters: [{ name: "XIAO_Fitness_Tracker" }],
+                    optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
                 });
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(0x181A);
-                stepCharacteristic = await service.getCharacteristic(0x2A53);
-                batteryCharacteristic = await service.getCharacteristic(0x2A19);
-                controlCharacteristic = await service.getCharacteristic(0x2A56);
+
+                document.getElementById('status').innerText = "Connecting...";
+                server = await device.gatt.connect();
+                service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+                characteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+
+                document.getElementById('status').innerText = "Connected!";
                 
-                stepCharacteristic.addEventListener("characteristicvaluechanged", handleStepData);
-                batteryCharacteristic.addEventListener("characteristicvaluechanged", handleBatteryData);
-                
-                await stepCharacteristic.startNotifications();
-                await batteryCharacteristic.startNotifications();
-                
-                alert("Connected to device!");
+                // Start Notifications
+                characteristic.addEventListener('characteristicvaluechanged', handleData);
+                await characteristic.startNotifications();
             } catch (error) {
-                alert("Failed to connect: " + error);
+                document.getElementById('status').innerText = "Connection Failed!";
+                console.error(error);
             }
-        });
-
-        document.getElementById("toggle").addEventListener("click", async () => {
-            if (!controlCharacteristic) return;
-            deviceOn = !deviceOn;
-            let value = new Uint8Array([deviceOn ? 0x01 : 0x00]);
-            await controlCharacteristic.writeValue(value);
-            document.getElementById("toggle").innerText = deviceOn ? "Turn Off" : "Turn On";
-        });
-
-        function handleStepData(event) {
-            let data = new TextDecoder().decode(event.target.value);
-            let [steps, calories] = data.split(",");
-            document.getElementById("steps").innerText = steps;
-            document.getElementById("calories").innerText = calories;
         }
 
-        function handleBatteryData(event) {
-            let battery = event.target.value.getUint8(0);
+        function handleData(event) {
+            let value = new TextDecoder().decode(event.target.value);
+            let [steps, calories, cycling, battery] = value.split(",");
+
+            document.getElementById("steps").innerText = steps;
+            document.getElementById("calories").innerText = calories;
+            document.getElementById("cycling").innerText = cycling;
             document.getElementById("battery").innerText = battery + "%";
         }
     </script>
