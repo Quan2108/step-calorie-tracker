@@ -131,10 +131,10 @@
                 const server = await device.gatt.connect();
                 fitnessService = await server.getPrimaryService('1819');
 
-                // Setup characteristics
+                // Setup characteristics with corrected UUIDs
                 const stepsChar = await fitnessService.getCharacteristic('2A19');
                 const bikeChar = await fitnessService.getCharacteristic('2AD7');
-                const batteryChar = await fitnessService.getCharacteristic('2A19');
+                const batteryChar = await fitnessService.getCharacteristic('00002A19-0000-1000-8000-00805F9B34FB');
                 const powerChar = await fitnessService.getCharacteristic('0000FFF1-0000-1000-8000-00805F9B34FB');
 
                 // Enable notifications
@@ -142,36 +142,33 @@
                 await bikeChar.startNotifications();
                 await batteryChar.startNotifications();
 
-                // Event listeners
-                stepsChar.addEventListener('characteristicvaluechanged', updateSteps);
-                bikeChar.addEventListener('characteristicvaluechanged', updateCycling);
-                batteryChar.addEventListener('characteristicvaluechanged', updateBattery);
-                
-                updateCalories();
+                // Event listeners with proper data parsing
+                stepsChar.addEventListener('characteristicvaluechanged', event => {
+                    const steps = event.target.value.getUint32(0, true);
+                    document.getElementById('steps').textContent = steps;
+                    updateCalories();
+                });
+
+                bikeChar.addEventListener('characteristicvaluechanged', event => {
+                    const distance = event.target.value.getFloat32(0, true).toFixed(2);
+                    document.getElementById('cycling').textContent = distance;
+                    updateCalories();
+                });
+
+                batteryChar.addEventListener('characteristicvaluechanged', event => {
+                    const percentage = event.target.value.getUint8(0);
+                    updateBatteryUI(percentage);
+                });
+
             } catch (error) {
                 console.error('Connection failed:', error);
             }
         }
 
-        function updateSteps(event) {
-            const steps = event.target.value.getUint32(0, true);
-            document.getElementById('steps').textContent = steps;
-            updateCalories();
-        }
-
-        function updateCycling(event) {
-            const distance = event.target.value.getFloat32(0, true).toFixed(2);
-            document.getElementById('cycling').textContent = distance;
-            updateCalories();
-        }
-
-        function updateBattery(event) {
-            const percentage = event.target.value.getUint8(0);
+        function updateBatteryUI(percentage) {
             document.getElementById('batteryPercentage').textContent = `${percentage}%`;
             const batteryBar = document.getElementById('batteryLevelBar');
             batteryBar.style.width = `${percentage}%`;
-            
-            // Update color based on level
             batteryBar.style.background = 
                 percentage < 20 ? 'red' :
                 percentage < 50 ? 'orange' : 'pink';
@@ -181,11 +178,10 @@
             const steps = parseInt(document.getElementById('steps').textContent);
             const distance = parseFloat(document.getElementById('cycling').textContent);
             const weight = userData.weight;
-            
-            // MET values: 3.5 (walking), 8.0 (cycling)
+
+            // MET-based calculation: 3.5 (walking), 8.0 (cycling)
             const calories = (steps * weight * 0.0003) + (distance * weight * 0.07);
             document.getElementById('calories').textContent = calories.toFixed(0);
-            
             updateHistory();
         }
 
@@ -193,7 +189,7 @@
             const today = new Date().toLocaleDateString();
             const historyList = document.getElementById('historyList');
             const entry = `${today}: ${document.getElementById('calories').textContent} kcal`;
-            
+
             if (!historyList.innerHTML.includes(today)) {
                 historyList.innerHTML = `<p>${entry}</p>` + historyList.innerHTML;
             }
@@ -214,7 +210,7 @@
                 height: document.getElementById('height').value,
                 age: document.getElementById('age').value
             };
-            
+
             localStorage.setItem('weight', userData.weight);
             localStorage.setItem('height', userData.height);
             localStorage.setItem('age', userData.age);
