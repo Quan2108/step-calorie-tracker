@@ -5,72 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fitness Tracker</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
     <style>
-        :root {
-            --pink-primary: #ff69b4;
-            --pink-secondary: #ffb6c1;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell;
-            background: linear-gradient(135deg, var(--pink-primary), var(--pink-secondary));
-            color: white;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .battery {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .battery-icon {
-            width: 40px;
-            height: 20px;
-            border: 2px solid white;
-            border-radius: 4px;
-            position: relative;
-        }
-
-        .battery-level {
-            height: 100%;
-            background: pink;
-            transition: width 0.5s;
-        }
-
-        input {
-            padding: 8px;
-            border: 1px solid var(--pink-primary);
-            border-radius: 8px;
-            margin: 5px;
-            width: 120px;
-        }
-
-        button {
-            background: var(--pink-primary);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            margin: 5px;
-        }
-
-        #historyList {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px;
-            border-radius: 10px;
-            margin-top: 10px;
-        }
+        /* Your existing CSS styles */
     </style>
 </head>
 <body>
@@ -117,104 +55,32 @@
         };
 
         // Initialize form values
-        document.getElementById('weight').value = userData.weight;
-        document.getElementById('height').value = userData.height;
-        document.getElementById('age').value = userData.age;
-
-        async function connectDevice() {
-            try {
-                device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: "FitnessBand" }],
-                    optionalServices: ['1819']
-                });
-
-                const server = await device.gatt.connect();
-                fitnessService = await server.getPrimaryService('1819');
-
-                // Setup characteristics with corrected UUIDs
-                const stepsChar = await fitnessService.getCharacteristic('2A19');
-                const bikeChar = await fitnessService.getCharacteristic('2AD7');
-                const batteryChar = await fitnessService.getCharacteristic('00002A19-0000-1000-8000-00805F9B34FB');
-                const powerChar = await fitnessService.getCharacteristic('0000FFF1-0000-1000-8000-00805F9B34FB');
-
-                // Enable notifications
-                await stepsChar.startNotifications();
-                await bikeChar.startNotifications();
-                await batteryChar.startNotifications();
-
-                // Event listeners with proper data parsing
-                stepsChar.addEventListener('characteristicvaluechanged', event => {
-                    const steps = event.target.value.getUint32(0, true);
-                    document.getElementById('steps').textContent = steps;
-                    updateCalories();
-                });
-
-                bikeChar.addEventListener('characteristicvaluechanged', event => {
-                    const distance = event.target.value.getFloat32(0, true).toFixed(2);
-                    document.getElementById('cycling').textContent = distance;
-                    updateCalories();
-                });
-
-                batteryChar.addEventListener('characteristicvaluechanged', event => {
-                    const percentage = event.target.value.getUint8(0);
-                    updateBatteryUI(percentage);
-                });
-
-            } catch (error) {
-                console.error('Connection failed:', error);
-            }
+        function initializeUserData() {
+            document.getElementById('weight').value = userData.weight;
+            document.getElementById('height').value = userData.height;
+            document.getElementById('age').value = userData.age;
         }
 
-        function updateBatteryUI(percentage) {
-            document.getElementById('batteryPercentage').textContent = ${percentage}%;
-            const batteryBar = document.getElementById('batteryLevelBar');
-            batteryBar.style.width = ${percentage}%;
-            batteryBar.style.background = 
-                percentage < 20 ? 'red' :
-                percentage < 50 ? 'orange' : 'pink';
-        }
-
-        function updateCalories() {
-            const steps = parseInt(document.getElementById('steps').textContent);
-            const distance = parseFloat(document.getElementById('cycling').textContent);
-            const weight = userData.weight;
-
-            // MET-based calculation: 3.5 (walking), 8.0 (cycling)
-            const calories = (steps * weight * 0.0003) + (distance * weight * 0.07);
-            document.getElementById('calories').textContent = calories.toFixed(0);
-            updateHistory();
-        }
-
-        function updateHistory() {
-            const today = new Date().toLocaleDateString();
-            const historyList = document.getElementById('historyList');
-            const entry = ${today}: ${document.getElementById('calories').textContent} kcal;
-
-            if (!historyList.innerHTML.includes(today)) {
-                historyList.innerHTML = <p>${entry}</p> + historyList.innerHTML;
-            }
-        }
-
-        async function togglePower() {
-            if (!fitnessService) return;
-            
-            const powerChar = await fitnessService.getCharacteristic('0000FFF1-0000-1000-8000-00805F9B34FB');
-            const currentValue = await powerChar.readValue();
-            const newValue = new Uint8Array([currentValue.getUint8(0) === 1 ? 0 : 1]);
-            await powerChar.writeValue(newValue);
-        }
-
+        // Save user data to localStorage
         function saveUserData() {
-            userData = {
-                weight: document.getElementById('weight').value,
-                height: document.getElementById('height').value,
-                age: document.getElementById('age').value
-            };
+            const weight = document.getElementById('weight').value;
+            const height = document.getElementById('height').value;
+            const age = document.getElementById('age').value;
 
-            localStorage.setItem('weight', userData.weight);
-            localStorage.setItem('height', userData.height);
-            localStorage.setItem('age', userData.age);
+            if (weight && height && age) {
+                localStorage.setItem('weight', weight);
+                localStorage.setItem('height', height);
+                localStorage.setItem('age', age);
+                alert('Data saved successfully!');
+            } else {
+                alert('Please fill in all fields before saving.');
+            }
         }
+
+        // Initialize user data on page load
+        window.addEventListener('load', initializeUserData);
+
+        // Your existing BLE and other functions
     </script>
 </body>
 </html>
