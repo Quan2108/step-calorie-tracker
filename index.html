@@ -1,64 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fitness Tracker</title>
-    <style>
-        body { background-color: pink; font-family: Arial, sans-serif; text-align: center; }
-        button { font-size: 20px; padding: 10px; margin: 10px; cursor: pointer; }
-        #status { font-size: 18px; margin-top: 20px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fitness Monitor</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #connect { margin-bottom: 10px; }
+    #status { margin-top: 10px; }
+  </style>
 </head>
 <body>
-    <h1>Fitness Tracker</h1>
-    <button onclick="connectBLE()">Connect to Device</button>
-    <button onclick="toggleDevice()">Turn On/Off</button>
-    <p id="status">Status: Disconnected</p>
-    <h2>History</h2>
-    <ul id="history"></ul>
+  <h1>Fitness Monitor</h1>
+  <button id="connect">Connect to Device</button>
+  <div id="status">Status: Disconnected</div>
+  <div id="data">
+    <p><strong>Steps:</strong> <span id="steps">0</span></p>
+    <p><strong>Distance:</strong> <span id="distance">0.0 km</span></p>
+  </div>
 
-    <script>
-        let bleDevice;
-        let bleServer;
-        let bleService;
-        let bleCharacteristic;
+  <script>
+    const connectButton = document.getElementById('connect');
+    const statusDiv = document.getElementById('status');
+    const stepsSpan = document.getElementById('steps');
+    const distanceSpan = document.getElementById('distance');
 
-        async function connectBLE() {
-            try {
-                bleDevice = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: ['battery_service']
-                });
-                bleServer = await bleDevice.gatt.connect();
-                document.getElementById("status").innerText = "Status: Connected!";
-                console.log("Connected to device!");
-                
-                // Read Battery Level (Optional)
-                bleService = await bleServer.getPrimaryService('battery_service');
-                bleCharacteristic = await bleService.getCharacteristic('battery_level');
-                let batteryValue = await bleCharacteristic.readValue();
-                let batteryLevel = batteryValue.getUint8(0);
-                console.log("Battery Level:", batteryLevel);
-                
-                // Simulate receiving step data
-                updateHistory("Steps: 100, Calories: 4.0, Cycling: 1.0 km");
-            } catch (error) {
-                console.log("Connection Failed", error);
-                document.getElementById("status").innerText = "Status: Connection Failed!";
-            }
-        }
+    const fitnessServiceUUID = '19B10000-E8F2-537E-4F6C-D104768A1214';
+    const stepCountCharUUID = '19B10001-E8F2-537E-4F6C-D104768A1215';
+    const distanceCharUUID = '19B10002-E8F2-537E-4F6C-D104768A1216';
 
-        function updateHistory(data) {
-            let historyList = document.getElementById("history");
-            let newItem = document.createElement("li");
-            newItem.textContent = data;
-            historyList.appendChild(newItem);
-        }
+    connectButton.addEventListener('click', async () => {
+      try {
+        statusDiv.textContent = 'Status: Connecting...';
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [fitnessServiceUUID] }]
+        });
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(fitnessServiceUUID);
+        const stepCountChar = await service.getCharacteristic(stepCountCharUUID);
+        const distanceChar = await service.getCharacteristic(distanceCharUUID);
 
-        function toggleDevice() {
-            alert("Toggling Device On/Off via Bluetooth...");
-        }
-    </script>
+        statusDiv.textContent = 'Status: Connected';
+
+        // Read initial values
+        const stepCountValue = await stepCountChar.readValue();
+        const distanceValue = await distanceChar.readValue();
+        stepsSpan.textContent = stepCountValue.getUint32(0);
+        distanceSpan.textContent = (distanceValue.getFloat32(0) / 1000).toFixed(2) + ' km';
+
+        // Set up notifications
+        await stepCountChar.startNotifications();
+        await distanceChar.startNotifications();
+
+        stepCountChar.addEventListener('characteristicvaluechanged', (event) => {
+          const value = event.target.value;
+          stepsSpan.textContent = value.getUint32(0);
+        });
+
+        distanceChar.addEventListener('characteristicvaluechanged', (event) => {
+          const value = event.target.value;
+          distanceSpan.textContent = (value.getFloat32(0) / 1000).toFixed(2) + ' km';
+        });
+      } catch (error) {
+        console.error('Error:', error);
+        statusDiv.textContent = 'Status: Error connecting to device';
+      }
+    });
+  </script>
 </body>
 </html>
