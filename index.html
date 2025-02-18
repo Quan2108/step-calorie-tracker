@@ -2,68 +2,57 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fitness Monitor</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    #connect { margin-bottom: 10px; }
-    #status { margin-top: 10px; }
-  </style>
 </head>
 <body>
   <h1>Fitness Monitor</h1>
   <button id="connect">Connect to Device</button>
-  <div id="status">Status: Disconnected</div>
-  <div id="data">
-    <p><strong>Steps:</strong> <span id="steps">0</span></p>
-    <p><strong>Distance:</strong> <span id="distance">0.0 km</span></p>
-  </div>
+  <p id="status">Status: Disconnected</p>
+  <p id="stepCount">Steps: 0</p>
+  <p id="distance">Distance: 0 km</p>
+  <p id="calories">Calories Burned: 0 kcal</p>
 
   <script>
     const connectButton = document.getElementById('connect');
-    const statusDiv = document.getElementById('status');
-    const stepsSpan = document.getElementById('steps');
-    const distanceSpan = document.getElementById('distance');
-
-    const fitnessServiceUUID = '19B10000-E8F2-537E-4F6C-D104768A1214';
-    const stepCountCharUUID = '19B10001-E8F2-537E-4F6C-D104768A1215';
-    const distanceCharUUID = '19B10002-E8F2-537E-4F6C-D104768A1216';
+    const statusElement = document.getElementById('status');
+    const stepCountElement = document.getElementById('stepCount');
+    const distanceElement = document.getElementById('distance');
+    const caloriesElement = document.getElementById('calories');
 
     connectButton.addEventListener('click', async () => {
       try {
-        statusDiv.textContent = 'Status: Connecting...';
+        statusElement.textContent = 'Status: Connecting...';
+
+        // Request the device
         const device = await navigator.bluetooth.requestDevice({
-          filters: [{ services: [fitnessServiceUUID] }]
+          filters: [{ services: ['19B10000-E8F2-537E-4F6C-D104768A1214'] }]
         });
+
+        // Connect to the device
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService(fitnessServiceUUID);
-        const stepCountChar = await service.getCharacteristic(stepCountCharUUID);
-        const distanceChar = await service.getCharacteristic(distanceCharUUID);
 
-        statusDiv.textContent = 'Status: Connected';
+        // Get the service
+        const service = await server.getPrimaryService('19B10000-E8F2-537E-4F6C-D104768A1214');
 
-        // Read initial values
+        // Get the characteristics
+        const stepCountChar = await service.getCharacteristic('19B10001-E8F2-537E-4F6C-D104768A1215');
+        const distanceChar = await service.getCharacteristic('19B10002-E8F2-537E-4F6C-D104768A1216');
+        const caloriesChar = await service.getCharacteristic('19B10003-E8F2-537E-4F6C-D104768A1217');
+
+        // Read the values
         const stepCountValue = await stepCountChar.readValue();
         const distanceValue = await distanceChar.readValue();
-        stepsSpan.textContent = stepCountValue.getUint32(0);
-        distanceSpan.textContent = (distanceValue.getFloat32(0) / 1000).toFixed(2) + ' km';
+        const caloriesValue = await caloriesChar.readValue();
 
-        // Set up notifications
-        await stepCountChar.startNotifications();
-        await distanceChar.startNotifications();
+        // Update the UI
+        stepCountElement.textContent = `Steps: ${stepCountValue.getUint32(0)}`;
+        distanceElement.textContent = `Distance: ${(distanceValue.getFloat32(0) / 1000).toFixed(2)} km`;
+        caloriesElement.textContent = `Calories Burned: ${caloriesValue.getFloat32(0).toFixed(2)} kcal`;
 
-        stepCountChar.addEventListener('characteristicvaluechanged', (event) => {
-          const value = event.target.value;
-          stepsSpan.textContent = value.getUint32(0);
-        });
-
-        distanceChar.addEventListener('characteristicvaluechanged', (event) => {
-          const value = event.target.value;
-          distanceSpan.textContent = (value.getFloat32(0) / 1000).toFixed(2) + ' km';
-        });
+        statusElement.textContent = 'Status: Connected';
       } catch (error) {
         console.error('Error:', error);
-        statusDiv.textContent = 'Status: Error connecting to device';
+        statusElement.textContent = 'Status: Error connecting to device';
       }
     });
   </script>
